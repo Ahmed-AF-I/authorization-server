@@ -8,6 +8,7 @@ import com.nimbusds.jose.proc.SecurityContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -18,11 +19,16 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.settings.OAuth2TokenFormat;
+import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
+import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
@@ -32,7 +38,10 @@ import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.interfaces.RSAPrivateCrtKey;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @Configuration
 @EnableWebSecurity
@@ -53,6 +62,17 @@ public class SecurityConfig {
                 .with(authorizationServerConfigurer, authorizationServer ->
                         authorizationServer.oidc(Customizer.withDefaults())
                 )
+//                .getConfigurer(OAuth2AuthorizationServerConfigurer.class).authorizationEndpoint(
+//                        a -> a.authenticationProvider(getAuthorizationEndpointProvider())
+//                )
+
+                .with(authorizationServerConfigurer, authorizationServer ->
+                       authorizationServer.authorizationEndpoint(
+                               a ->
+                                       a.authenticationProviders(getAuthorizationEndpointProvider())
+                       )
+                )
+
 
                 .authorizeHttpRequests(authorize ->
                         authorize.anyRequest().authenticated()
@@ -65,6 +85,16 @@ public class SecurityConfig {
                 );
 
         return http.build();
+    }
+
+    private Consumer<List<AuthenticationProvider>> getAuthorizationEndpointProvider() {
+        return providers -> {
+            for (AuthenticationProvider p : providers){
+                if(p instanceof OAuth2AuthorizationCodeRequestAuthenticationProvider x){
+                    x.setAuthenticationValidator(new CustomRedirectUriValidator());
+                }
+            }
+        };
     }
 
     @Bean
@@ -113,6 +143,12 @@ public class SecurityConfig {
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .tokenSettings(
+                        TokenSettings.builder()
+                                .accessTokenFormat(OAuth2TokenFormat.REFERENCE)
+                                .accessTokenTimeToLive(Duration.ofSeconds(600))
+                                .build()
+                )
                 .build();
 
         return new InMemoryRegisteredClientRepository(client);
@@ -121,6 +157,7 @@ public class SecurityConfig {
     @Bean
     public AuthorizationServerSettings authorizationServerSettings() {
         return AuthorizationServerSettings.builder()
+                .issuer("http://localhost:8080/auth/realms/springone")
                 .build();
     }
 
@@ -140,5 +177,10 @@ public class SecurityConfig {
 
         JWKSet jwkSet = new JWKSet(rsaKey);
         return new ImmutableJWKSet<>(jwkSet);
+    }
+
+    @Bean
+    public OAuth2TokenCustomizer<JwtEncodingContext> oAuth2TokenCustomizer(){
+        return context -> context.getClaims().claim("info", "This is a custom claim");
     }
 }
