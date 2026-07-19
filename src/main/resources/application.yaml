@@ -2,3 +2,13 @@ spring:
   application:
     name: spring-security-e11
     version: 1.0.0
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER_NAME}
+
+  jpa:
+    hibernate:
+      ddl-auto: ${DDL_AUTO:none}
+    open-in-view: false
+

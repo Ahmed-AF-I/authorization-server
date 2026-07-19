@@ -73,9 +73,12 @@ public class SecurityConfig {
                        )
                 )
 
+                .formLogin(Customizer.withDefaults())
 
                 .authorizeHttpRequests(authorize ->
-                        authorize.anyRequest().authenticated()
+                        authorize
+                                .requestMatchers("/login", "/error").permitAll()
+                                .anyRequest().authenticated()
                 )
 
                 .exceptionHandling(exceptionHandling ->
@@ -112,46 +115,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService(
-            PasswordEncoder passwordEncoder
-    ) {
-
-        var u1 = User.withUsername("user")
-                .password(passwordEncoder.encode("password"))
-                .authorities("read")
-                .build();
-
-        return new InMemoryUserDetailsManager(u1);
-
-    }
-
-    @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
-    }
-
-    @Bean
-    public RegisteredClientRepository registeredClientRepository(
-            PasswordEncoder passwordEncoder
-    ) {
-        var client = RegisteredClient.withId(UUID.randomUUID().toString())
-                .clientId("client")
-                .clientSecret(passwordEncoder.encode("secret"))
-                .scope(OidcScopes.OPENID)
-                .scope(OidcScopes.PROFILE)
-                .redirectUri("http://springone.io/authorized")
-                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-                .tokenSettings(
-                        TokenSettings.builder()
-                                .accessTokenFormat(OAuth2TokenFormat.REFERENCE)
-                                .accessTokenTimeToLive(Duration.ofSeconds(600))
-                                .build()
-                )
-                .build();
-
-        return new InMemoryRegisteredClientRepository(client);
     }
 
     @Bean
