@@ -46,10 +46,3 @@ The `jwkSource` bean automatically generates an **RSA key pair (2048-bit)** dyna
 2. **User Login:** The user is prompted with a login form and enters credentials (`user` / `password`).
 3. **Authorization Code:** Upon successful authentication, the server redirects back to the registered Redirect URI with an authorization `code`.
 4. **Token Exchange:** The client application exchanges this `code` alongside its `Client Secret` to safely obtain the **Access Token**, **Refresh Token**, and **ID Token (JWT)**.
-
----
-
-## ⚠️ Important Production Considerations
-
-* **In-Memory Storage:** Both users (`InMemoryUserDetailsManager`) and clients (`InMemoryRegisteredClientRepository`) are saved in volatile memory. For a production environment, you must switch to persistent storage such as database-backed repositories (JDBC).
-* **Ephemeral Cryptographic Keys:** Keys are generated dynamically on startup. If the server restarts, a new key pair will be generated, which immediately invalidates all previously issued tokens. For production, keys must be loaded from a permanent, secure external `KeyStore`.
