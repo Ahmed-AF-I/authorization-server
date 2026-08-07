@@ -8,6 +8,7 @@ import com.nimbusds.jose.proc.SecurityContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -15,13 +16,16 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationContext;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationProvider;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationValidator;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -62,8 +66,6 @@ public class SecurityConfig {
                        )
                 )
 
-                .formLogin(Customizer.withDefaults())
-
                 .authorizeHttpRequests(authorize ->
                         authorize
                                 .requestMatchers("/login", "/error").permitAll()
@@ -71,23 +73,37 @@ public class SecurityConfig {
                 )
 
                 .exceptionHandling(exceptionHandling ->
-                        exceptionHandling.authenticationEntryPoint(
-                                new LoginUrlAuthenticationEntryPoint("/login")
+                        exceptionHandling.defaultAuthenticationEntryPointFor(
+                                new LoginUrlAuthenticationEntryPoint("/login"),
+                                new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
                         )
                 );
 
         return http.build();
     }
 
-    private Consumer<List<AuthenticationProvider>> getAuthorizationEndpointProvider() {
-        return providers -> {
-            for (AuthenticationProvider p : providers){
-                if(p instanceof OAuth2AuthorizationCodeRequestAuthenticationProvider x){
-                    x.setAuthenticationValidator(new CustomRedirectUriValidator());
-                }
+//    private Consumer<List<AuthenticationProvider>> getAuthorizationEndpointProvider() {
+//        return providers -> {
+//            for (AuthenticationProvider p : providers){
+//                if(p instanceof OAuth2AuthorizationCodeRequestAuthenticationProvider x){
+//                    x.setAuthenticationValidator(new CustomRedirectUriValidator());
+//                }
+//            }
+//        };
+//    }
+private Consumer<List<AuthenticationProvider>> getAuthorizationEndpointProvider() {
+    return providers -> {
+        for (AuthenticationProvider p : providers) {
+            if (p instanceof OAuth2AuthorizationCodeRequestAuthenticationProvider x) {
+                Consumer<OAuth2AuthorizationCodeRequestAuthenticationContext> combinedValidator =
+                        OAuth2AuthorizationCodeRequestAuthenticationValidator.DEFAULT_REDIRECT_URI_VALIDATOR
+                                .andThen(OAuth2AuthorizationCodeRequestAuthenticationValidator.DEFAULT_SCOPE_VALIDATOR)
+                                .andThen(new CustomRedirectUriValidator());
+                x.setAuthenticationValidator(combinedValidator);
             }
-        };
-    }
+        }
+    };
+}
 
     @Bean
     @Order(2)
@@ -96,8 +112,8 @@ public class SecurityConfig {
     ) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
-                        .anyRequest()
-                        .authenticated())
+                        .requestMatchers("/login", "/error", "/css/**", "/js/**").permitAll()
+                        .anyRequest().authenticated())
                 .formLogin(Customizer.withDefaults());
 
         return http.build();
