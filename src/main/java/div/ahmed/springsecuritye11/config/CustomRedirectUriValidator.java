@@ -14,15 +14,18 @@ public class CustomRedirectUriValidator implements
 
     @Override
     public void accept(
-            OAuth2AuthorizationCodeRequestAuthenticationContext Context
+            OAuth2AuthorizationCodeRequestAuthenticationContext context
     ) {
-        OAuth2AuthorizationCodeRequestAuthenticationToken authentication = Context.getAuthentication();
-        RegisteredClient registeredClient = Context.getRegisteredClient();
+        OAuth2AuthorizationCodeRequestAuthenticationToken authentication =
+                context.getAuthentication();
+        RegisteredClient registeredClient = context.getRegisteredClient();
         String redirectUri = authentication.getRedirectUri();
 
-        if(!registeredClient.getRedirectUris().contains(redirectUri)){
-            var error = new OAuth2Error(OAuth2ErrorCodes.INVALID_REQUEST);
-            throw new OAuth2AuthorizationCodeRequestAuthenticationException(error, null);
+        if (redirectUri != null && !redirectUri.startsWith("https://")
+                && !redirectUri.startsWith("http://127.0.0.1")
+                && !redirectUri.startsWith("http://localhost")) {
+            throw new OAuth2AuthorizationCodeRequestAuthenticationException(
+                    new OAuth2Error(OAuth2ErrorCodes.INVALID_REQUEST), null);
         }
     }
 }

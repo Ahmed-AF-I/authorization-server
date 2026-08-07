@@ -4,6 +4,7 @@ import div.ahmed.springsecuritye11.entities.Client;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.stereotype.Component;
 
@@ -44,9 +45,10 @@ public class ClientMapper {
 
     public RegisteredClient toRegisteredClient(Client client) {
 
-        return RegisteredClient.withId(String.valueOf(client.getId()))
+        boolean isPublicClient = "none".equalsIgnoreCase(client.getAuthMethod());
+
+        var builder = RegisteredClient.withId(String.valueOf(client.getId()))
                 .clientId(client.getClientId())
-                .clientSecret(client.getClientSecret())
                 .redirectUri(client.getRedirectUri())
                 .scope(client.getScope())
                 .clientAuthenticationMethod(
@@ -59,6 +61,13 @@ public class ClientMapper {
                         .accessTokenTimeToLive(Duration.ofMinutes(15))
                         .build()
                 )
-                .build();
+                .clientSettings(ClientSettings.builder()
+                        .requireProofKey(isPublicClient)
+                        .build()
+                );
+        if (client.getClientSecret() != null &&  !client.getClientSecret().isBlank()) {
+            builder.clientSecret(client.getClientSecret());
+        }
+        return builder.build();
     }
 }
